@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createExpense, updateExpense, deleteExpense, updateVacation, importCategories, getVacations } from '../utils/db';
 import { useVacation } from '../contexts/VacationContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Trash2, Edit3, Filter, ArrowUpDown, Search, Tag, X, Check, ChevronDown, Upload, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, Edit3, Filter, ArrowUpDown, Search, Tag, X, Check, ChevronDown, Upload, ArrowUp, ArrowDown, Info } from 'lucide-react';
 
 const currencySymbols = { EUR: '€', USD: '$', GBP: '£', CHF: 'CHF', JPY: '¥', TRY: '₺', THB: '฿', SEK: 'kr', NOK: 'kr', DKK: 'kr', PLN: 'zł', CZK: 'Kč', HUF: 'Ft', HRK: 'kn', BGN: 'лв', RON: 'lei' };
 
@@ -27,6 +27,9 @@ export default function Expenses() {
   const [filterPaidBy, setFilterPaidBy] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showCurrencyInfo, setShowCurrencyInfo] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
 
   // Edit state
   const [editExpense, setEditExpense] = useState(null);
@@ -117,6 +120,27 @@ export default function Expenses() {
   const addCategory = async (cat) => {
     if (!currentVacation || categories.includes(cat)) return;
     await updateVacation(currentVacation.id, { categories: [...categories, cat] });
+    await refreshVacation();
+  };
+
+  const deleteCategory = async (cat) => {
+    if (!currentVacation) return;
+    const updated = categories.filter(c => c !== cat);
+    await updateVacation(currentVacation.id, { categories: updated });
+    if (formData.category === cat) setFormData(p => ({ ...p, category: '' }));
+    await refreshVacation();
+  };
+
+  const renameCategory = async (oldName, newName) => {
+    if (!currentVacation || !newName.trim() || newName.trim() === oldName) {
+      setEditingCategory(null);
+      return;
+    }
+    const trimmed = newName.trim();
+    const updated = categories.map(c => c === oldName ? trimmed : c);
+    await updateVacation(currentVacation.id, { categories: updated });
+    if (formData.category === oldName) setFormData(p => ({ ...p, category: trimmed }));
+    setEditingCategory(null);
     await refreshVacation();
   };
 
@@ -225,7 +249,37 @@ export default function Expenses() {
                 )}
 
                 {field.type === 'currency' ? (
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrencyInfo(prev => !prev)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '3px 8px', borderRadius: 6, border: '1px solid #e2e8f0',
+                          background: '#f8fafc', color: '#64748b', fontSize: 11, cursor: 'pointer',
+                        }}
+                      >
+                        <Info size={12} /> Info
+                      </button>
+                    </div>
+                    <AnimatePresence>
+                      {showCurrencyInfo && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          style={{
+                            background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10,
+                            padding: '10px 12px', fontSize: 13, color: '#1e40af', marginBottom: 8,
+                            lineHeight: 1.5, overflow: 'hidden',
+                          }}
+                        >
+                          Die Wechselkurse beziehen sich auf die Basiswährung (EUR). Ein Kurs von 1.08 bei USD bedeutet: 1 EUR = 1.08 USD. Ausgaben werden automatisch in EUR umgerechnet.
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <div style={{ display: 'flex', gap: 8 }}>
                     <select
                       ref={el => inputRefs.current[field.key] = el}
                       value={formData.currency || defaultCurrency}
@@ -249,6 +303,7 @@ export default function Expenses() {
                       onKeyDown={e => handleKeyDown(e, field.key)}
                       style={{ ...s.input, flex: 1, fontSize: 13 }}
                     />
+                  </div>
                   </div>
                 ) : field.type === 'category' ? (
                   <div style={{ position: 'relative' }}>
@@ -348,19 +403,42 @@ export default function Expenses() {
                             <div
                               key={cat}
                               onMouseDown={e => e.preventDefault()}
-                              onClick={() => {
-                                setFormData(p => ({ ...p, category: cat }));
-                                setCategorySearch(cat);
-                                setShowCategoryDropdown(false);
-                              }}
                               style={{
-                                padding: '10px 16px', cursor: 'pointer', fontSize: 14,
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '6px 10px 6px 16px', cursor: 'pointer', fontSize: 14,
                                 borderBottom: '1px solid #f1f5f9',
                                 background: formData.category === cat ? '#e0f2fe' : 'transparent',
                                 fontWeight: formData.category === cat ? 600 : 400,
                               }}
                             >
-                              {cat}
+                              {editingCategory === cat ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }} onClick={e => e.stopPropagation()}>
+                                  <input
+                                    autoFocus
+                                    value={editCategoryName}
+                                    onChange={e => setEditCategoryName(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') renameCategory(cat, editCategoryName);
+                                      if (e.key === 'Escape') setEditingCategory(null);
+                                    }}
+                                    style={{ flex: 1, padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 13, outline: 'none' }}
+                                  />
+                                  <button onMouseDown={e => e.preventDefault()} onClick={() => renameCategory(cat, editCategoryName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#22c55e' }}><Check size={14} /></button>
+                                  <button onMouseDown={e => e.preventDefault()} onClick={() => setEditingCategory(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#94a3b8' }}><X size={14} /></button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span onClick={() => {
+                                    setFormData(p => ({ ...p, category: cat }));
+                                    setCategorySearch(cat);
+                                    setShowCategoryDropdown(false);
+                                  }} style={{ flex: 1, padding: '4px 0' }}>{cat}</span>
+                                  <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => { setEditingCategory(cat); setEditCategoryName(cat); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8' }}><Edit3 size={13} /></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => deleteCategory(cat)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#ef4444' }}><Trash2 size={13} /></button>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           ))}
                           {categories.length === 0 && (
@@ -658,26 +736,44 @@ export default function Expenses() {
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 15, color: '#1e293b', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {exp.name || 'Ohne Name'}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ fontWeight: 600, fontSize: 15, color: '#1e293b', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {exp.name || 'Ohne Name'}
+                  </div>
+                  <div style={{ textAlign: 'right', marginLeft: 12, flexShrink: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: '#0c4a6e' }}>{formatAmount(exp)}</div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 2 }}>
                   {exp.category && <span style={s.badge}>{exp.category}</span>}
                   {exp.date && <span style={{ fontSize: 12, color: '#94a3b8' }}>{new Date(exp.date).toLocaleDateString('de-DE')}</span>}
-                  {sharedMode && exp.paidBy && <span style={{ fontSize: 12, color: '#94a3b8' }}>von {exp.paidBy}</span>}
+                  {exp.time && <span style={{ fontSize: 12, color: '#94a3b8' }}>{exp.time}</span>}
+                  {exp.currency && exp.currency !== 'EUR' && (
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>{exp.currency}{exp.exchangeRate ? ` (Kurs: ${exp.exchangeRate})` : ''}</span>
+                  )}
                 </div>
+                {(sharedMode && (exp.paidBy || (exp.paidFor && exp.paidFor.length > 0))) && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+                    {exp.paidBy && <span style={{ fontSize: 12, color: '#64748b' }}>Bezahlt von: <strong>{exp.paidBy}</strong></span>}
+                    {exp.paidFor && exp.paidFor.length > 0 && (
+                      <span style={{ fontSize: 12, color: '#64748b' }}>Für: {exp.paidFor.join(', ')}</span>
+                    )}
+                  </div>
+                )}
+                {exp.note && (
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2, fontStyle: 'italic' }}>
+                    {exp.note}
+                  </div>
+                )}
               </div>
-              <div style={{ textAlign: 'right', marginLeft: 12, flexShrink: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 16, color: '#0c4a6e' }}>{formatAmount(exp)}</div>
-                <div style={{ display: 'flex', gap: 4, marginTop: 4, justifyContent: 'flex-end' }}>
-                  <motion.button
-                    whileTap={{ scale: 0.8 }}
-                    onClick={e => { e.stopPropagation(); setDeleteConfirm(exp.id); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#ef4444' }}
-                  >
-                    <Trash2 size={16} />
-                  </motion.button>
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', marginLeft: 8, flexShrink: 0 }}>
+                <motion.button
+                  whileTap={{ scale: 0.8 }}
+                  onClick={e => { e.stopPropagation(); setDeleteConfirm(exp.id); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#ef4444' }}
+                >
+                  <Trash2 size={16} />
+                </motion.button>
               </div>
             </motion.div>
           ))}

@@ -5,7 +5,8 @@ import { Pie, Bar } from 'react-chartjs-2';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { updateVacation } from '../utils/db';
 import { useVacation } from '../contexts/VacationContext';
-import { Plus, Trash2, Edit3, TrendingUp, DollarSign, Calendar, BarChart3, PieChart, X, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Edit3, TrendingUp, DollarSign, Calendar, BarChart3, PieChart, X, Eye, EyeOff, Download, Image, FileText, FileSpreadsheet } from 'lucide-react';
+import { exportAsImage, exportAsPDF, exportAsExcel } from '../utils/exportUtils';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
@@ -504,6 +505,48 @@ export default function Overview() {
             );
           })
         )}
+      </div>
+
+      {/* Export Section */}
+      <div style={s.section}>
+        <div style={s.sectionHeader}>
+          <div style={s.sectionTitle}><Download size={18} /> Export</div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => exportAsImage('export-content', `${currentVacation?.name || 'urlaub'}.png`)}
+            style={{ ...s.btn, background: '#3b82f615', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Image size={16} /> Bild (PNG)
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => exportAsPDF('export-content', `${currentVacation?.name || 'urlaub'}.pdf`)}
+            style={{ ...s.btn, background: '#ef444415', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <FileText size={16} /> PDF
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              const data = (expenses || []).map(e => ({
+                Ausgabe: e.name,
+                Betrag: e.amount,
+                Währung: e.currency,
+                Kategorie: e.category,
+                Datum: e.date,
+              }));
+              exportAsExcel(data, `${currentVacation?.name || 'urlaub'}.xlsx`);
+            }}
+            style={{ ...s.btn, background: '#10b98115', color: '#10b981', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <FileSpreadsheet size={16} /> Excel
+          </motion.button>
+        </div>
       </div>
 
       {/* Modals */}

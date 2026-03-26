@@ -4,8 +4,8 @@ import { BarChart3, Receipt, Plane, Settings, Users } from 'lucide-react';
 const tabs = [
   { id: 'overview', label: 'Übersicht', icon: BarChart3 },
   { id: 'expenses', label: 'Ausgaben', icon: Receipt },
-  { id: 'vacations', label: 'Urlaube', icon: Plane },
   { id: 'shared', label: 'Gemeinsam', icon: Users, sharedOnly: true },
+  { id: 'vacations', label: 'Urlaube', icon: Plane },
   { id: 'settings', label: 'Einstellungen', icon: Settings },
 ];
 

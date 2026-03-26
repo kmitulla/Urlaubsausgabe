@@ -417,8 +417,22 @@ export default function SharedVacation() {
     await refreshVacation();
   };
 
+  const prepareAndExport = async (exportFn) => {
+    // Temporarily show settlements and breakdown for export
+    const prevSettlements = showSettlements;
+    const prevSections = { ...sectionsOpen };
+    setShowSettlements(true);
+    setSectionsOpen(prev => ({ ...prev, summary: true, breakdown: true }));
+    // Wait for render
+    await new Promise(r => setTimeout(r, 400));
+    await exportFn();
+    // Restore state
+    setShowSettlements(prevSettlements);
+    setSectionsOpen(prevSections);
+  };
+
   const handleExportPDF = () => {
-    exportSharedVacationPDF('shared-vacation-export', `Gemeinsamer_Urlaub_${currentVacation.name || 'Export'}.pdf`);
+    prepareAndExport(() => exportSharedVacationPDF('shared-vacation-export', `Gemeinsamer_Urlaub_${currentVacation.name || 'Export'}.pdf`));
   };
 
   const handleExportExcel = () => {
@@ -426,7 +440,7 @@ export default function SharedVacation() {
   };
 
   const handleExportImage = () => {
-    exportAsImage('shared-vacation-export', `Gemeinsamer_Urlaub_${currentVacation.name || 'Export'}.png`);
+    prepareAndExport(() => exportAsImage('shared-vacation-export', `Gemeinsamer_Urlaub_${currentVacation.name || 'Export'}.png`));
   };
 
   if (!currentVacation || !currentVacation.settings?.participants?.length) {
@@ -555,7 +569,7 @@ export default function SharedVacation() {
           <button style={styles.cardHeader} onClick={() => toggleSection('summary')}>
             <div style={styles.cardHeaderLeft}>
               <DollarSign size={18} color="#10b981" />
-              <h3 style={styles.cardTitle}>Ubersichtstabelle</h3>
+              <h3 style={styles.cardTitle}>Übersichtstabelle</h3>
             </div>
             <motion.div
               animate={{ rotate: sectionsOpen.summary ? 180 : 0 }}
@@ -684,7 +698,6 @@ export default function SharedVacation() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
       {/* Abrechnen Button */}
       <motion.div
@@ -814,6 +827,7 @@ export default function SharedVacation() {
           )}
         </AnimatePresence>
       </motion.div>
+      </div>{/* End shared-vacation-export */}
 
       {/* Export Section */}
       <motion.div

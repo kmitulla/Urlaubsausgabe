@@ -850,27 +850,6 @@ export default function Settings({ onAdminPanel, onLogout }) {
         </Section>
       </motion.div>
 
-      {/* Export */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.35 }}
-      >
-        <Section icon={<Download size={18} color="#8b5cf6" />} title="Export">
-          <div style={styles.exportRow}>
-            <button style={styles.exportBtn('#3b82f6')} onClick={handleExportImage}>
-              <Image size={17} /> Bild (PNG)
-            </button>
-            <button style={styles.exportBtn('#ef4444')} onClick={handleExportPDF}>
-              <FileText size={17} /> PDF
-            </button>
-            <button style={styles.exportBtn('#10b981')} onClick={handleExportExcel}>
-              <FileSpreadsheet size={17} /> Excel
-            </button>
-          </div>
-        </Section>
-      </motion.div>
-
       {/* Change Password */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}

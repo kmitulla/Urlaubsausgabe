@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createVacation, deleteVacation, updateVacation, joinVacation } from '../utils/db';
 import { useVacation } from '../contexts/VacationContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Trash2, Edit3, Plane, Check, X } from 'lucide-react';
+import { Plus, Trash2, Edit3, Plane, Check, X, Copy } from 'lucide-react';
 
 const styles = {
   page: {
@@ -342,6 +342,26 @@ export default function Vacations() {
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
+  const [copiedCode, setCopiedCode] = useState(null);
+
+  const handleCopyCode = async (code, e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = code;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    }
+  };
 
   const handleCreate = async () => {
     const trimmed = newName.trim();
@@ -548,6 +568,33 @@ export default function Vacations() {
                               >
                                 Ausgewählt
                               </motion.span>
+                            )}
+                            {vac.inviteCode && (
+                              <div
+                                onClick={(e) => handleCopyCode(vac.inviteCode, e)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  marginTop: '0.4rem',
+                                  padding: '0.2rem 0.6rem',
+                                  background: copiedCode === vac.inviteCode ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  transition: 'background 0.2s',
+                                }}
+                              >
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  color: copiedCode === vac.inviteCode ? '#22c55e' : '#94a3b8',
+                                  fontWeight: 600,
+                                  letterSpacing: '0.08em',
+                                  fontFamily: 'monospace',
+                                }}>
+                                  {copiedCode === vac.inviteCode ? 'Kopiert!' : `Code: ${vac.inviteCode}`}
+                                </span>
+                                <Copy size={12} color={copiedCode === vac.inviteCode ? '#22c55e' : '#94a3b8'} />
+                              </div>
                             )}
                           </>
                         )}

@@ -66,7 +66,8 @@ export function exportSharedVacationExcel(expenses, settlements, participants, f
     'Währung': e.currency || 'EUR',
     'Kategorie': e.category || '',
     'Bezahlt von': e.paidBy || '',
-    'Bezahlt für': (e.paidFor || []).join(', ')
+    'Bezahlt für': (e.paidFor || []).join(', '),
+    'Notiz': e.note || ''
   }));
   const ws1 = XLSX.utils.json_to_sheet(expData);
   XLSX.utils.book_append_sheet(wb, ws1, 'Ausgaben');
@@ -79,6 +80,23 @@ export function exportSharedVacationExcel(expenses, settlements, participants, f
   }));
   const ws2 = XLSX.utils.json_to_sheet(settData);
   XLSX.utils.book_append_sheet(wb, ws2, 'Ausgleichszahlungen');
+
+  // Sheet 3: Per-person breakdown
+  const personData = [];
+  (participants || []).forEach(p => {
+    const paidExps = expenses.filter(e => e.paidBy === p);
+    const involvedExps = expenses.filter(e => (e.paidFor || []).includes(p));
+    const totalPaid = paidExps.reduce((sum, e) => sum + (parseFloat(e.amount) || 0) / (parseFloat(e.exchangeRate) || 1), 0);
+    const totalOwed = involvedExps.reduce((sum, e) => sum + ((parseFloat(e.amount) || 0) / (parseFloat(e.exchangeRate) || 1)) / (e.paidFor?.length || 1), 0);
+    personData.push({
+      'Teilnehmer': p,
+      'Bezahlt gesamt': Math.round(totalPaid * 100) / 100,
+      'Anteil gesamt': Math.round(totalOwed * 100) / 100,
+      'Bilanz': Math.round((totalPaid - totalOwed) * 100) / 100,
+    });
+  });
+  const ws3 = XLSX.utils.json_to_sheet(personData);
+  XLSX.utils.book_append_sheet(wb, ws3, 'Pro Person');
 
   XLSX.writeFile(wb, filename);
 }
