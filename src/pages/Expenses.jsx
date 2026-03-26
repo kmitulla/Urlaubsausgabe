@@ -12,7 +12,6 @@ export default function Expenses() {
   const { currentUser } = useAuth();
 
   // Quick add state
-  const [step, setStep] = useState(0);
   const [formData, setFormData] = useState({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
@@ -60,22 +59,21 @@ export default function Expenses() {
       name: '', amount: '', currency: defaultCurrency, exchangeRate: exchangeRates[defaultCurrency] || 1,
       category: '', date: today, time: '', note: '', paidBy: participants[0] || '', paidFor: [...participants],
     });
-    setStep(0);
     setCategorySearch('');
   };
 
   useEffect(() => { resetForm(); }, [currentVacation?.id]);
 
-  const handleKeyDown = (e) => {
+  const fieldOrder = getFields().map(f => f.key);
+
+  const handleKeyDown = (e, fieldKey) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const fields = getFields();
-      if (step < fields.length - 1) {
-        setStep(step + 1);
-        setTimeout(() => {
-          const nextField = fields[step + 1];
-          inputRefs.current[nextField.key]?.focus();
-        }, 50);
+      setShowCategoryDropdown(false);
+      const idx = fieldOrder.indexOf(fieldKey);
+      if (idx < fieldOrder.length - 1) {
+        const nextKey = fieldOrder[idx + 1];
+        setTimeout(() => inputRefs.current[nextKey]?.focus(), 30);
       } else {
         handleSubmit();
       }
@@ -200,24 +198,8 @@ export default function Expenses() {
               <button onClick={() => setShowAddForm(false)} style={{ ...s.btnGhost, padding: 4 }}><X size={20} /></button>
             </div>
 
-            {/* Step indicators */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-              {getFields().map((f, i) => (
-                <div key={f.key} style={{
-                  flex: 1, height: 3, borderRadius: 3,
-                  background: i <= step ? '#0ea5e9' : '#e2e8f0',
-                  transition: 'background 0.3s',
-                }} />
-              ))}
-            </div>
-
-            {getFields().map((field, idx) => (
-              <motion.div
-                key={field.key}
-                initial={false}
-                animate={{ opacity: idx <= step ? 1 : 0.3, height: idx <= step ? 'auto' : 0, marginBottom: idx <= step ? 12 : 0 }}
-                style={{ overflow: idx <= step ? 'visible' : 'hidden' }}
-              >
+            {getFields().map((field) => (
+              <div key={field.key} style={{ marginBottom: 12 }}>
                 <label style={s.label}>{field.label}</label>
 
                 {field.type === 'currency' ? (
@@ -229,23 +211,22 @@ export default function Expenses() {
                         const cur = e.target.value;
                         setFormData(p => ({ ...p, currency: cur, exchangeRate: exchangeRates[cur] || 1 }));
                       }}
-                      onKeyDown={handleKeyDown}
-                      style={{ ...s.select, flex: 1 }}
+                      onKeyDown={e => handleKeyDown(e, field.key)}
+                      style={{ ...s.select, flex: 1, boxSizing: 'border-box' }}
                     >
                       {Object.keys(exchangeRates).map(c => (
                         <option key={c} value={c}>{c} {currencySymbols[c] ? `(${currencySymbols[c]})` : ''}</option>
                       ))}
                     </select>
-                    <div style={{ flex: 1 }}>
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="Wechselkurs"
-                        value={formData.exchangeRate || ''}
-                        onChange={e => setFormData(p => ({ ...p, exchangeRate: e.target.value }))}
-                        style={{ ...s.input, fontSize: 13 }}
-                      />
-                    </div>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="Wechselkurs"
+                      value={formData.exchangeRate || ''}
+                      onChange={e => setFormData(p => ({ ...p, exchangeRate: e.target.value }))}
+                      onKeyDown={e => handleKeyDown(e, field.key)}
+                      style={{ ...s.input, flex: 1, fontSize: 13 }}
+                    />
                   </div>
                 ) : field.type === 'category' ? (
                   <div style={{ position: 'relative' }}>
@@ -260,16 +241,17 @@ export default function Expenses() {
                         setShowCategoryDropdown(true);
                       }}
                       onFocus={() => setShowCategoryDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowCategoryDropdown(false), 200)}
                       onKeyDown={e => {
                         if (e.key === 'Enter' && categorySearch && !categories.includes(categorySearch)) {
                           addCategory(categorySearch);
                         }
-                        handleKeyDown(e);
+                        handleKeyDown(e, field.key);
                       }}
                       style={s.input}
                     />
                     <AnimatePresence>
-                      {showCategoryDropdown && (
+                      {showCategoryDropdown && filteredCategories.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: -5 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -283,6 +265,7 @@ export default function Expenses() {
                           {filteredCategories.map(cat => (
                             <div
                               key={cat}
+                              onMouseDown={e => e.preventDefault()}
                               onClick={() => {
                                 setFormData(p => ({ ...p, category: cat }));
                                 setCategorySearch(cat);
@@ -291,16 +274,14 @@ export default function Expenses() {
                               style={{
                                 padding: '10px 16px', cursor: 'pointer', fontSize: 14,
                                 borderBottom: '1px solid #f1f5f9',
-                                background: formData.category === cat ? '#f0f9ff' : 'transparent',
                               }}
-                              onMouseEnter={e => e.target.style.background = '#f0f9ff'}
-                              onMouseLeave={e => e.target.style.background = formData.category === cat ? '#f0f9ff' : 'transparent'}
                             >
                               {cat}
                             </div>
                           ))}
                           {categorySearch && !categories.includes(categorySearch) && (
                             <div
+                              onMouseDown={e => e.preventDefault()}
                               onClick={() => { addCategory(categorySearch); setShowCategoryDropdown(false); }}
                               style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, color: '#0ea5e9', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
                             >
@@ -316,14 +297,14 @@ export default function Expenses() {
                     ref={el => inputRefs.current[field.key] = el}
                     value={formData.paidBy || ''}
                     onChange={e => setFormData(p => ({ ...p, paidBy: e.target.value }))}
-                    onKeyDown={handleKeyDown}
-                    style={s.select}
+                    onKeyDown={e => handleKeyDown(e, field.key)}
+                    style={{ ...s.select, width: '100%', boxSizing: 'border-box' }}
                   >
                     <option value="">-- Wählen --</option>
                     {participants.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 ) : field.type === 'paidFor' ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  <div ref={el => inputRefs.current[field.key] = el} tabIndex={0} onKeyDown={e => handleKeyDown(e, field.key)} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, outline: 'none' }}>
                     {participants.map(p => (
                       <label key={p} style={{
                         display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
@@ -358,12 +339,11 @@ export default function Expenses() {
                     placeholder={field.label}
                     value={formData[field.key] || ''}
                     onChange={e => setFormData(p => ({ ...p, [field.key]: e.target.value }))}
-                    onKeyDown={handleKeyDown}
-                    onFocus={() => { if (idx > step) setStep(idx); }}
+                    onKeyDown={e => handleKeyDown(e, field.key)}
                     style={s.input}
                   />
                 )}
-              </motion.div>
+              </div>
             ))}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
