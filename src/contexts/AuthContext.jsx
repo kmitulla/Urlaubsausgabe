@@ -10,15 +10,23 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const stored = localStorage.getItem('urlaubUser');
     if (stored) {
-      const parsed = JSON.parse(stored);
-      getUser(parsed.id).then(user => {
-        if (user) {
-          setCurrentUser(user);
-        } else {
+      try {
+        const parsed = JSON.parse(stored);
+        getUser(parsed.id).then(user => {
+          if (user) {
+            setCurrentUser(user);
+          } else {
+            localStorage.removeItem('urlaubUser');
+          }
+          setLoading(false);
+        }).catch(() => {
           localStorage.removeItem('urlaubUser');
-        }
+          setLoading(false);
+        });
+      } catch {
+        localStorage.removeItem('urlaubUser');
         setLoading(false);
-      });
+      }
     } else {
       setLoading(false);
     }

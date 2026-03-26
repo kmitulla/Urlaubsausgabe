@@ -174,11 +174,6 @@ export default function Login() {
     e.preventDefault();
     setError('');
 
-    if (newPassword.length < 4) {
-      setError('Das Passwort muss mindestens 4 Zeichen lang sein.');
-      return;
-    }
-
     if (newPassword !== confirmPassword) {
       setError('Die Passwörter stimmen nicht überein.');
       return;
@@ -340,7 +335,6 @@ export default function Login() {
                   style={getInputStyle('password')}
                   placeholder="Dein Passwort"
                   autoComplete="current-password"
-                  required
                 />
               </motion.div>
 
@@ -386,7 +380,6 @@ export default function Login() {
                   style={getInputStyle('newPassword')}
                   placeholder="Neues Passwort eingeben"
                   autoComplete="new-password"
-                  required
                 />
               </motion.div>
 
@@ -406,7 +399,6 @@ export default function Login() {
                   style={getInputStyle('confirmPassword')}
                   placeholder="Passwort wiederholen"
                   autoComplete="new-password"
-                  required
                 />
               </motion.div>
 
