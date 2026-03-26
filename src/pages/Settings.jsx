@@ -5,7 +5,7 @@ import { updateUser } from '../utils/db';
 import { useVacation } from '../contexts/VacationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { exportAsImage, exportAsPDF, exportAsExcel } from '../utils/exportUtils';
-import { Settings as SettingsIcon, DollarSign, Eye, EyeOff, Users, Download, Key, LogOut, ChevronDown, ChevronUp, Plus, Trash2, Save, X, Image, FileText, FileSpreadsheet, UserCog } from 'lucide-react';
+import { Settings as SettingsIcon, DollarSign, Eye, EyeOff, Users, Download, Key, LogOut, ChevronDown, ChevronUp, Plus, Trash2, Save, X, Image, FileText, FileSpreadsheet, UserCog, User, Info, Edit3 } from 'lucide-react';
 
 const styles = {
   container: {
@@ -299,10 +299,10 @@ const fieldLabels = {
   time: 'Uhrzeit',
   category: 'Kategorie',
   amount: 'Betrag',
-  currency: 'Waehrung',
+  currency: 'Währung',
   note: 'Notiz',
   paidBy: 'Bezahlt von',
-  paidFor: 'Bezahlt fuer',
+  paidFor: 'Bezahlt für',
 };
 
 function Toggle({ on, onToggle }) {
@@ -366,17 +366,25 @@ export default function Settings({ onAdminPanel, onLogout }) {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
+  const [vacationName, setVacationName] = useState(currentVacation?.name || '');
+  const [showRateInfo, setShowRateInfo] = useState(false);
+  const [percentageSplits, setPercentageSplits] = useState(settings.percentageSplits || false);
+
   const [toast, setToast] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (currentVacation?.settings) {
-      const s = currentVacation.settings;
-      setVisibleFields(s.visibleFields || {});
-      setExchangeRates(s.exchangeRates || { EUR: 1 });
-      setDefaultCurrency(s.defaultExchangeRate || 'EUR');
-      setSharedMode(s.sharedMode || false);
-      setParticipants(s.participants || []);
+    if (currentVacation) {
+      setVacationName(currentVacation.name || '');
+      if (currentVacation.settings) {
+        const s = currentVacation.settings;
+        setVisibleFields(s.visibleFields || {});
+        setExchangeRates(s.exchangeRates || { EUR: 1 });
+        setDefaultCurrency(s.defaultExchangeRate || 'EUR');
+        setSharedMode(s.sharedMode || false);
+        setParticipants(s.participants || []);
+        setPercentageSplits(s.percentageSplits || false);
+      }
     }
   }, [currentVacation]);
 
@@ -396,6 +404,7 @@ export default function Settings({ onAdminPanel, onLogout }) {
         defaultExchangeRate: defaultCurrency,
         sharedMode,
         participants,
+        percentageSplits,
         ...overrides,
       };
       await updateVacation(currentVacation.id, { settings: newSettings });
@@ -494,7 +503,7 @@ export default function Settings({ onAdminPanel, onLogout }) {
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError('Die Passwoerter stimmen nicht ueberein.');
+      setPasswordError('Die Passwörter stimmen nicht überein.');
       return;
     }
 
@@ -504,22 +513,54 @@ export default function Settings({ onAdminPanel, onLogout }) {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setPasswordSuccess('Passwort erfolgreich geaendert.');
-      showToast('Passwort geaendert');
+      setPasswordSuccess('Passwort erfolgreich geändert.');
+      showToast('Passwort geändert');
     } catch (e) {
-      setPasswordError('Fehler beim Aendern des Passworts.');
+      setPasswordError('Fehler beim Ändern des Passworts.');
     }
+  };
+
+  // --- Vacation Name ---
+  const handleSaveVacationName = async () => {
+    if (!vacationName.trim()) return;
+    await updateVacation(currentVacation.id, { name: vacationName.trim() });
+    await refreshVacation();
+    showToast('Urlaubsname gespeichert');
+  };
+
+  // --- Percentage Splits ---
+  const handlePercentageSplitsToggle = () => {
+    const next = !percentageSplits;
+    setPercentageSplits(next);
+    saveSettings({ percentageSplits: next });
   };
 
   // --- Export ---
   const handleExportImage = () => {
-    exportAsImage('vacation-export', `${currentVacation?.name || 'urlaub'}.png`);
+    const el = document.getElementById('export-content');
+    if (!el) {
+      alert('Bitte gehe zur Übersicht und nutze den Export dort');
+      return;
+    }
+    exportAsImage('export-content', `${currentVacation?.name || 'urlaub'}.png`);
   };
   const handleExportPDF = () => {
-    exportAsPDF('vacation-export', `${currentVacation?.name || 'urlaub'}.pdf`);
+    const el = document.getElementById('export-content');
+    if (!el) {
+      alert('Bitte gehe zur Übersicht und nutze den Export dort');
+      return;
+    }
+    exportAsPDF('export-content', `${currentVacation?.name || 'urlaub'}.pdf`);
   };
   const handleExportExcel = () => {
-    exportAsExcel(expenses, `${currentVacation?.name || 'urlaub'}.xlsx`);
+    const data = (expenses || []).map(e => ({
+      Ausgabe: e.name,
+      Betrag: e.amount,
+      Währung: e.currency,
+      Kategorie: e.category,
+      Datum: e.date,
+    }));
+    exportAsExcel(data, `${currentVacation?.name || 'urlaub'}.xlsx`);
   };
 
   // --- Logout ---
@@ -532,7 +573,7 @@ export default function Settings({ onAdminPanel, onLogout }) {
     return (
       <div style={styles.container}>
         <p style={{ color: '#64748b', textAlign: 'center', marginTop: '3rem' }}>
-          Kein Urlaub ausgewaehlt.
+          Kein Urlaub ausgewählt.
         </p>
       </div>
     );
@@ -553,6 +594,55 @@ export default function Settings({ onAdminPanel, onLogout }) {
       >
         <SettingsIcon size={28} color="#0d9488" />
         <h1 style={styles.headerTitle}>Einstellungen</h1>
+      </motion.div>
+
+      {/* Logged-in User */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.02, duration: 0.35 }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          padding: '0.75rem 1.25rem',
+          background: '#f0fdf4',
+          borderRadius: '12px',
+          border: '1px solid #bbf7d0',
+          marginBottom: '1rem',
+          fontSize: '0.9rem',
+          color: '#166534',
+          fontWeight: 500,
+        }}
+      >
+        <User size={16} color="#16a34a" />
+        Angemeldet als: {currentUser?.username}
+      </motion.div>
+
+      {/* Rename Vacation */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.03, duration: 0.35 }}
+      >
+        <Section icon={<Edit3 size={18} color="#0d9488" />} title="Urlaub umbenennen" defaultOpen>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <input
+              style={{ ...styles.input, flex: 1 }}
+              value={vacationName}
+              onChange={(e) => setVacationName(e.target.value)}
+              placeholder="Urlaubsname"
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveVacationName()}
+            />
+            <button
+              style={{ ...styles.smallBtn('#10b981'), width: '40px', height: '40px' }}
+              onClick={handleSaveVacationName}
+              title="Speichern"
+            >
+              <Save size={16} />
+            </button>
+          </div>
+        </Section>
       </motion.div>
 
       {/* Visible Fields */}
@@ -582,6 +672,48 @@ export default function Settings({ onAdminPanel, onLogout }) {
         transition={{ delay: 0.1, duration: 0.35 }}
       >
         <Section icon={<DollarSign size={18} color="#f59e0b" />} title="Wechselkurse">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowRateInfo(!showRateInfo); }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.35rem 0.65rem',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                color: '#64748b',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              <Info size={14} /> Info
+            </button>
+          </div>
+          <AnimatePresence>
+            {showRateInfo && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '10px',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.85rem',
+                  color: '#1e40af',
+                  marginBottom: '0.75rem',
+                  lineHeight: 1.5,
+                  overflow: 'hidden',
+                }}
+              >
+                Die Wechselkurse beziehen sich auf die Basiswährung (EUR). Ein Kurs von 1.08 bei USD bedeutet: 1 EUR = 1.08 USD. Wenn du eine Ausgabe in USD erfasst, wird sie automatisch in EUR umgerechnet.
+              </motion.div>
+            )}
+          </AnimatePresence>
           {Object.entries(exchangeRates).map(([code, rate]) => (
             <div style={styles.rateRow} key={code}>
               <span style={styles.rateCode}>{code}</span>
@@ -627,13 +759,13 @@ export default function Settings({ onAdminPanel, onLogout }) {
             <button
               style={styles.smallBtn('#10b981')}
               onClick={handleAddCurrency}
-              title="Hinzufuegen"
+              title="Hinzufügen"
             >
               <Plus size={16} />
             </button>
           </div>
 
-          <div style={styles.selectLabel}>Standardwaehrung</div>
+          <div style={styles.selectLabel}>Standardwährung</div>
           <select
             style={styles.select}
             value={defaultCurrency}
@@ -657,6 +789,13 @@ export default function Settings({ onAdminPanel, onLogout }) {
             <span style={styles.toggleLabel}>Gemeinsamer Modus</span>
             <Toggle on={sharedMode} onToggle={handleSharedToggle} />
           </div>
+
+          {sharedMode && (
+            <div style={styles.toggleRow}>
+              <span style={styles.toggleLabel}>Prozentuale Aufteilung</span>
+              <Toggle on={percentageSplits} onToggle={handlePercentageSplitsToggle} />
+            </div>
+          )}
 
           <AnimatePresence initial={false}>
             {sharedMode && (
@@ -685,7 +824,7 @@ export default function Settings({ onAdminPanel, onLogout }) {
                   <div style={styles.addRow}>
                     <input
                       style={{ ...styles.rateInput, flex: 1 }}
-                      placeholder="Name hinzufuegen"
+                      placeholder="Name hinzufügen"
                       value={newParticipant}
                       onChange={(e) => setNewParticipant(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddParticipant()}
@@ -693,7 +832,7 @@ export default function Settings({ onAdminPanel, onLogout }) {
                     <button
                       style={styles.smallBtn('#10b981')}
                       onClick={handleAddParticipant}
-                      title="Hinzufuegen"
+                      title="Hinzufügen"
                     >
                       <Plus size={16} />
                     </button>
@@ -738,7 +877,7 @@ export default function Settings({ onAdminPanel, onLogout }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25, duration: 0.35 }}
       >
-        <Section icon={<Key size={18} color="#f97316" />} title="Passwort aendern">
+        <Section icon={<Key size={18} color="#f97316" />} title="Passwort ändern">
           {currentUser?.password && (
             <div style={styles.inputGroup}>
               <label style={styles.inputLabel}>Aktuelles Passwort</label>
@@ -762,7 +901,7 @@ export default function Settings({ onAdminPanel, onLogout }) {
             />
           </div>
           <div style={styles.inputGroup}>
-            <label style={styles.inputLabel}>Passwort bestaetigen</label>
+            <label style={styles.inputLabel}>Passwort bestätigen</label>
             <input
               style={styles.input}
               type="password"

@@ -16,6 +16,8 @@ export default function Expenses() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   // List state
   const [searchText, setSearchText] = useState('');
@@ -55,11 +57,17 @@ export default function Expenses() {
 
   const resetForm = () => {
     const today = new Date().toISOString().split('T')[0];
+    const equalShare = participants.length > 0 ? parseFloat((100 / participants.length).toFixed(2)) : 0;
+    const defaultShares = {};
+    participants.forEach(p => { defaultShares[p] = equalShare; });
     setFormData({
       name: '', amount: '', currency: defaultCurrency, exchangeRate: exchangeRates[defaultCurrency] || 1,
       category: '', date: today, time: '', note: '', paidBy: participants[0] || '', paidFor: [...participants],
+      paidForShares: defaultShares,
     });
     setCategorySearch('');
+    setShowNewCategoryInput(false);
+    setNewCategoryName('');
   };
 
   useEffect(() => { resetForm(); }, [currentVacation?.id]);
@@ -163,11 +171,11 @@ export default function Expenses() {
     label: { fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' },
     overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 },
     modal: { background: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 500, maxHeight: '85vh', overflow: 'auto' },
-    fab: { position: 'fixed', bottom: 90, right: 20, width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)', color: '#fff', border: 'none', boxShadow: '0 4px 20px rgba(14,165,233,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
+    fab: { position: 'fixed', bottom: 100, right: 20, width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)', color: '#fff', border: 'none', boxShadow: '0 4px 20px rgba(14,165,233,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
     expenseCard: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#fff', borderRadius: 14, marginBottom: 8, boxShadow: '0 1px 6px rgba(0,0,0,0.04)', border: '1px solid #f1f5f9', cursor: 'pointer' },
     badge: { display: 'inline-block', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f0f9ff', color: '#0ea5e9' },
     filterBar: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' },
-    select: { padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, background: '#f8fafc', outline: 'none', cursor: 'pointer' },
+    select: { padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, background: '#f8fafc', outline: 'none', cursor: 'pointer', width: '100%', boxSizing: 'border-box' },
   };
 
   return (
@@ -200,7 +208,21 @@ export default function Expenses() {
 
             {getFields().map((field) => (
               <div key={field.key} style={{ marginBottom: 12 }}>
-                <label style={s.label}>{field.label}</label>
+                {field.type === 'category' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <label style={{ ...s.label, marginBottom: 0 }}>{field.label}</label>
+                    <button
+                      type="button"
+                      onClick={() => { setShowNewCategoryInput(true); setNewCategoryName(''); }}
+                      style={{ background: '#e0f2fe', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                      title="Neue Kategorie hinzufügen"
+                    >
+                      <Plus size={14} color="#0284c7" />
+                    </button>
+                  </div>
+                ) : (
+                  <label style={s.label}>{field.label}</label>
+                )}
 
                 {field.type === 'currency' ? (
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -230,28 +252,75 @@ export default function Expenses() {
                   </div>
                 ) : field.type === 'category' ? (
                   <div style={{ position: 'relative' }}>
-                    <input
-                      ref={el => inputRefs.current[field.key] = el}
-                      type="text"
-                      placeholder="Kategorie eingeben..."
-                      value={categorySearch || formData.category || ''}
-                      onChange={e => {
-                        setCategorySearch(e.target.value);
-                        setFormData(p => ({ ...p, category: e.target.value }));
-                        setShowCategoryDropdown(true);
-                      }}
-                      onFocus={() => setShowCategoryDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowCategoryDropdown(false), 200)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && categorySearch && !categories.includes(categorySearch)) {
-                          addCategory(categorySearch);
-                        }
-                        handleKeyDown(e, field.key);
-                      }}
-                      style={s.input}
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        ref={el => inputRefs.current[field.key] = el}
+                        type="text"
+                        readOnly
+                        inputMode="none"
+                        placeholder="Kategorie wählen..."
+                        value={formData.category || ''}
+                        onClick={() => setShowCategoryDropdown(prev => !prev)}
+                        onKeyDown={e => handleKeyDown(e, field.key)}
+                        style={{ ...s.input, cursor: 'pointer', caretColor: 'transparent' }}
+                      />
+                      <ChevronDown size={16} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+                    </div>
+
+                    {/* New category inline input */}
                     <AnimatePresence>
-                      {showCategoryDropdown && filteredCategories.length > 0 && (
+                      {showNewCategoryInput && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          style={{ overflow: 'hidden', marginTop: 6 }}
+                        >
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <input
+                              type="text"
+                              autoFocus
+                              placeholder="Neue Kategorie..."
+                              value={newCategoryName}
+                              onChange={e => setNewCategoryName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' && newCategoryName.trim()) {
+                                  addCategory(newCategoryName.trim());
+                                  setFormData(p => ({ ...p, category: newCategoryName.trim() }));
+                                  setNewCategoryName('');
+                                  setShowNewCategoryInput(false);
+                                }
+                              }}
+                              style={{ ...s.input, flex: 1, padding: '8px 12px', fontSize: 13 }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (newCategoryName.trim()) {
+                                  addCategory(newCategoryName.trim());
+                                  setFormData(p => ({ ...p, category: newCategoryName.trim() }));
+                                  setNewCategoryName('');
+                                  setShowNewCategoryInput(false);
+                                }
+                              }}
+                              style={{ ...s.btn, ...s.btnPrimary, padding: '8px 12px', flexShrink: 0 }}
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setShowNewCategoryInput(false); setNewCategoryName(''); }}
+                              style={{ ...s.btn, background: '#f1f5f9', color: '#64748b', padding: '8px 12px', flexShrink: 0 }}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                      {showCategoryDropdown && (
                         <motion.div
                           initial={{ opacity: 0, y: -5 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -262,7 +331,20 @@ export default function Expenses() {
                             border: '1px solid #e2e8f0', maxHeight: 200, overflow: 'auto', marginTop: 4,
                           }}
                         >
-                          {filteredCategories.map(cat => (
+                          {formData.category && (
+                            <div
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => {
+                                setFormData(p => ({ ...p, category: '' }));
+                                setCategorySearch('');
+                                setShowCategoryDropdown(false);
+                              }}
+                              style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, color: '#94a3b8', fontStyle: 'italic', borderBottom: '1px solid #f1f5f9' }}
+                            >
+                              Keine Kategorie
+                            </div>
+                          )}
+                          {categories.map(cat => (
                             <div
                               key={cat}
                               onMouseDown={e => e.preventDefault()}
@@ -274,18 +356,16 @@ export default function Expenses() {
                               style={{
                                 padding: '10px 16px', cursor: 'pointer', fontSize: 14,
                                 borderBottom: '1px solid #f1f5f9',
+                                background: formData.category === cat ? '#e0f2fe' : 'transparent',
+                                fontWeight: formData.category === cat ? 600 : 400,
                               }}
                             >
                               {cat}
                             </div>
                           ))}
-                          {categorySearch && !categories.includes(categorySearch) && (
-                            <div
-                              onMouseDown={e => e.preventDefault()}
-                              onClick={() => { addCategory(categorySearch); setShowCategoryDropdown(false); }}
-                              style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, color: '#0ea5e9', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
-                            >
-                              <Plus size={14} /> "{categorySearch}" hinzufügen
+                          {categories.length === 0 && (
+                            <div style={{ padding: '10px 16px', fontSize: 14, color: '#94a3b8' }}>
+                              Keine Kategorien vorhanden
                             </div>
                           )}
                         </motion.div>
@@ -304,38 +384,102 @@ export default function Expenses() {
                     {participants.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 ) : field.type === 'paidFor' ? (
-                  <div ref={el => inputRefs.current[field.key] = el} tabIndex={0} onKeyDown={e => handleKeyDown(e, field.key)} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, outline: 'none' }}>
-                    {participants.map(p => (
-                      <label key={p} style={{
-                        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-                        borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 500,
-                        background: (formData.paidFor || []).includes(p) ? '#e0f2fe' : '#f1f5f9',
-                        color: (formData.paidFor || []).includes(p) ? '#0284c7' : '#64748b',
-                        border: `2px solid ${(formData.paidFor || []).includes(p) ? '#0ea5e9' : 'transparent'}`,
-                        transition: 'all 0.2s',
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={(formData.paidFor || []).includes(p)}
-                          onChange={e => {
-                            const cur = formData.paidFor || [];
-                            setFormData(prev => ({
-                              ...prev,
-                              paidFor: e.target.checked ? [...cur, p] : cur.filter(x => x !== p),
-                            }));
-                          }}
-                          style={{ display: 'none' }}
-                        />
-                        {(formData.paidFor || []).includes(p) && <Check size={14} />}
-                        {p}
-                      </label>
-                    ))}
+                  <div ref={el => inputRefs.current[field.key] = el} tabIndex={0} onKeyDown={e => handleKeyDown(e, field.key)} style={{ display: 'flex', flexDirection: 'column', gap: 8, outline: 'none' }}>
+                    {participants.map(p => {
+                      const isChecked = (formData.paidFor || []).includes(p);
+                      const percentageSplits = currentVacation?.settings?.percentageSplits;
+                      return (
+                        <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <label style={{
+                            display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+                            borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 500,
+                            background: isChecked ? '#e0f2fe' : '#f1f5f9',
+                            color: isChecked ? '#0284c7' : '#64748b',
+                            border: `2px solid ${isChecked ? '#0ea5e9' : 'transparent'}`,
+                            transition: 'all 0.2s', flex: 1,
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={e => {
+                                const cur = formData.paidFor || [];
+                                const newPaidFor = e.target.checked ? [...cur, p] : cur.filter(x => x !== p);
+                                const newShares = { ...(formData.paidForShares || {}) };
+                                if (e.target.checked) {
+                                  const equalShare = parseFloat((100 / newPaidFor.length).toFixed(2));
+                                  newPaidFor.forEach(pp => { newShares[pp] = equalShare; });
+                                } else {
+                                  delete newShares[p];
+                                  if (newPaidFor.length > 0) {
+                                    const equalShare = parseFloat((100 / newPaidFor.length).toFixed(2));
+                                    newPaidFor.forEach(pp => { newShares[pp] = equalShare; });
+                                  }
+                                }
+                                setFormData(prev => ({
+                                  ...prev,
+                                  paidFor: newPaidFor,
+                                  paidForShares: newShares,
+                                }));
+                              }}
+                              style={{ display: 'none' }}
+                            />
+                            {isChecked && <Check size={14} />}
+                            {p}
+                          </label>
+                          {percentageSplits && isChecked && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                pattern="[0-9]*\.?[0-9]*"
+                                value={formData.paidForShares?.[p] ?? ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    paidForShares: { ...(prev.paidForShares || {}), [p]: val === '' ? '' : parseFloat(val) || 0 },
+                                  }));
+                                }}
+                                style={{ ...s.input, width: 60, padding: '6px 8px', fontSize: 13, textAlign: 'right' }}
+                              />
+                              <span style={{ fontSize: 13, color: '#64748b' }}>%</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {currentVacation?.settings?.percentageSplits && (formData.paidFor || []).length > 0 && (() => {
+                      const total = (formData.paidFor || []).reduce((sum, p) => sum + (parseFloat(formData.paidForShares?.[p]) || 0), 0);
+                      const isValid = Math.abs(total - 100) < 0.1;
+                      return (
+                        <div style={{ fontSize: 12, color: isValid ? '#16a34a' : '#ef4444', fontWeight: 600, paddingLeft: 4 }}>
+                          Summe: {total.toFixed(1)}% {!isValid && '(muss 100% ergeben)'}
+                        </div>
+                      );
+                    })()}
                   </div>
+                ) : field.type === 'number' ? (
+                  <input
+                    ref={el => inputRefs.current[field.key] = el}
+                    type="text"
+                    inputMode="decimal"
+                    pattern="[0-9]*\.?[0-9]*"
+                    placeholder={field.label}
+                    value={formData[field.key] || ''}
+                    onChange={e => setFormData(p => ({ ...p, [field.key]: e.target.value }))}
+                    onBlur={e => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val)) {
+                        setFormData(p => ({ ...p, [field.key]: val.toFixed(2) }));
+                      }
+                    }}
+                    onKeyDown={e => handleKeyDown(e, field.key)}
+                    style={s.input}
+                  />
                 ) : (
                   <input
                     ref={el => inputRefs.current[field.key] = el}
                     type={field.type}
-                    step={field.type === 'number' ? '0.01' : undefined}
                     placeholder={field.label}
                     value={formData[field.key] || ''}
                     onChange={e => setFormData(p => ({ ...p, [field.key]: e.target.value }))}
@@ -502,7 +646,16 @@ export default function Expenses() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.03 }}
               style={s.expenseCard}
-              onClick={() => { setEditExpense(exp); setEditData({ ...exp }); }}
+              onClick={() => {
+                setEditExpense(exp);
+                const data = { ...exp };
+                if (!data.paidForShares && (data.paidFor || []).length > 0) {
+                  const equalShare = parseFloat((100 / data.paidFor.length).toFixed(2));
+                  data.paidForShares = {};
+                  data.paidFor.forEach(p => { data.paidForShares[p] = equalShare; });
+                }
+                setEditData(data);
+              }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 15, color: '#1e293b', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -560,20 +713,88 @@ export default function Expenses() {
               {[
                 { key: 'name', label: 'Ausgabe', type: 'text' },
                 { key: 'amount', label: 'Betrag', type: 'number' },
-                { key: 'category', label: 'Kategorie', type: 'text' },
+                { key: 'category', label: 'Kategorie', type: 'category' },
                 { key: 'date', label: 'Datum', type: 'date' },
                 { key: 'time', label: 'Uhrzeit', type: 'time' },
                 { key: 'note', label: 'Notiz', type: 'text' },
               ].map(field => (
                 <div key={field.key} style={{ marginBottom: 14 }}>
                   <label style={s.label}>{field.label}</label>
-                  <input
-                    type={field.type}
-                    step={field.type === 'number' ? '0.01' : undefined}
-                    value={editData[field.key] || ''}
-                    onChange={e => setEditData(p => ({ ...p, [field.key]: e.target.value }))}
-                    style={s.input}
-                  />
+                  {field.type === 'number' ? (
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*\.?[0-9]*"
+                      value={editData[field.key] || ''}
+                      onChange={e => setEditData(p => ({ ...p, [field.key]: e.target.value }))}
+                      onBlur={e => {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val)) {
+                          setEditData(p => ({ ...p, [field.key]: val.toFixed(2) }));
+                        }
+                      }}
+                      style={s.input}
+                    />
+                  ) : field.type === 'category' ? (
+                    <div style={{ position: 'relative' }}>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          readOnly
+                          inputMode="none"
+                          placeholder="Kategorie wählen..."
+                          value={editData.category || ''}
+                          onClick={() => setShowCategoryDropdown(prev => !prev)}
+                          style={{ ...s.input, cursor: 'pointer', caretColor: 'transparent' }}
+                        />
+                        <ChevronDown size={16} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+                      </div>
+                      <AnimatePresence>
+                        {showCategoryDropdown && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -5 }}
+                            style={{
+                              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                              background: '#fff', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                              border: '1px solid #e2e8f0', maxHeight: 200, overflow: 'auto', marginTop: 4,
+                            }}
+                          >
+                            <div
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => { setEditData(p => ({ ...p, category: '' })); setShowCategoryDropdown(false); }}
+                              style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 14, color: '#94a3b8', fontStyle: 'italic', borderBottom: '1px solid #f1f5f9' }}
+                            >
+                              Keine Kategorie
+                            </div>
+                            {categories.map(cat => (
+                              <div
+                                key={cat}
+                                onMouseDown={e => e.preventDefault()}
+                                onClick={() => { setEditData(p => ({ ...p, category: cat })); setShowCategoryDropdown(false); }}
+                                style={{
+                                  padding: '10px 16px', cursor: 'pointer', fontSize: 14,
+                                  borderBottom: '1px solid #f1f5f9',
+                                  background: editData.category === cat ? '#e0f2fe' : 'transparent',
+                                  fontWeight: editData.category === cat ? 600 : 400,
+                                }}
+                              >
+                                {cat}
+                              </div>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ) : (
+                    <input
+                      type={field.type}
+                      value={editData[field.key] || ''}
+                      onChange={e => setEditData(p => ({ ...p, [field.key]: e.target.value }))}
+                      style={s.input}
+                    />
+                  )}
                 </div>
               ))}
 
@@ -598,27 +819,79 @@ export default function Expenses() {
                   </div>
                   <div style={{ marginBottom: 14 }}>
                     <label style={s.label}>Bezahlt für</label>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {participants.map(p => (
-                        <label key={p} style={{
-                          display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
-                          borderRadius: 10, cursor: 'pointer', fontSize: 13,
-                          background: (editData.paidFor || []).includes(p) ? '#e0f2fe' : '#f1f5f9',
-                          color: (editData.paidFor || []).includes(p) ? '#0284c7' : '#64748b',
-                        }}>
-                          <input
-                            type="checkbox"
-                            checked={(editData.paidFor || []).includes(p)}
-                            onChange={e => {
-                              const cur = editData.paidFor || [];
-                              setEditData(prev => ({ ...prev, paidFor: e.target.checked ? [...cur, p] : cur.filter(x => x !== p) }));
-                            }}
-                            style={{ display: 'none' }}
-                          />
-                          {(editData.paidFor || []).includes(p) && <Check size={12} />}
-                          {p}
-                        </label>
-                      ))}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {participants.map(p => {
+                        const isChecked = (editData.paidFor || []).includes(p);
+                        const percentageSplits = currentVacation?.settings?.percentageSplits;
+                        return (
+                          <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <label style={{
+                              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
+                              borderRadius: 10, cursor: 'pointer', fontSize: 13,
+                              background: isChecked ? '#e0f2fe' : '#f1f5f9',
+                              color: isChecked ? '#0284c7' : '#64748b',
+                              border: `2px solid ${isChecked ? '#0ea5e9' : 'transparent'}`,
+                              transition: 'all 0.2s', flex: 1,
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={e => {
+                                  const cur = editData.paidFor || [];
+                                  const newPaidFor = e.target.checked ? [...cur, p] : cur.filter(x => x !== p);
+                                  const newShares = { ...(editData.paidForShares || {}) };
+                                  if (e.target.checked) {
+                                    const equalShare = parseFloat((100 / newPaidFor.length).toFixed(2));
+                                    newPaidFor.forEach(pp => { newShares[pp] = equalShare; });
+                                  } else {
+                                    delete newShares[p];
+                                    if (newPaidFor.length > 0) {
+                                      const equalShare = parseFloat((100 / newPaidFor.length).toFixed(2));
+                                      newPaidFor.forEach(pp => { newShares[pp] = equalShare; });
+                                    }
+                                  }
+                                  setEditData(prev => ({
+                                    ...prev,
+                                    paidFor: newPaidFor,
+                                    paidForShares: newShares,
+                                  }));
+                                }}
+                                style={{ display: 'none' }}
+                              />
+                              {isChecked && <Check size={12} />}
+                              {p}
+                            </label>
+                            {percentageSplits && isChecked && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  pattern="[0-9]*\.?[0-9]*"
+                                  value={editData.paidForShares?.[p] ?? ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setEditData(prev => ({
+                                      ...prev,
+                                      paidForShares: { ...(prev.paidForShares || {}), [p]: val === '' ? '' : parseFloat(val) || 0 },
+                                    }));
+                                  }}
+                                  style={{ ...s.input, width: 60, padding: '6px 8px', fontSize: 13, textAlign: 'right' }}
+                                />
+                                <span style={{ fontSize: 13, color: '#64748b' }}>%</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {currentVacation?.settings?.percentageSplits && (editData.paidFor || []).length > 0 && (() => {
+                        const total = (editData.paidFor || []).reduce((sum, p) => sum + (parseFloat(editData.paidForShares?.[p]) || 0), 0);
+                        const isValid = Math.abs(total - 100) < 0.1;
+                        return (
+                          <div style={{ fontSize: 12, color: isValid ? '#16a34a' : '#ef4444', fontWeight: 600, paddingLeft: 4 }}>
+                            Summe: {total.toFixed(1)}% {!isValid && '(muss 100% ergeben)'}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </>

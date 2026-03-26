@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createVacation, deleteVacation, updateVacation } from '../utils/db';
+import { createVacation, deleteVacation, updateVacation, joinVacation } from '../utils/db';
 import { useVacation } from '../contexts/VacationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Trash2, Edit3, Plane, Check, X } from 'lucide-react';
@@ -47,7 +47,7 @@ const styles = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
     gap: '1rem',
   },
   card: (isSelected) => ({
@@ -137,7 +137,7 @@ const styles = {
   },
   fab: {
     position: 'fixed',
-    bottom: '2rem',
+    bottom: '100px',
     right: '2rem',
     width: '56px',
     height: '56px',
@@ -339,6 +339,10 @@ export default function Vacations() {
   const [deletingId, setDeletingId] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState('');
+
   const handleCreate = async () => {
     const trimmed = newName.trim();
     if (!trimmed || !currentUser) return;
@@ -354,6 +358,27 @@ export default function Vacations() {
     setCreating(false);
   };
 
+  const handleJoin = async () => {
+    const trimmed = joinCode.trim();
+    if (!trimmed || !currentUser) return;
+    setJoining(true);
+    setJoinError('');
+    try {
+      const result = await joinVacation(trimmed, currentUser.id);
+      if (result.success) {
+        await loadVacations();
+        setJoinCode('');
+        setShowCreateModal(false);
+      } else {
+        setJoinError(result.error);
+      }
+    } catch (err) {
+      console.error('Fehler beim Beitreten:', err);
+      setJoinError('Fehler beim Beitreten');
+    }
+    setJoining(false);
+  };
+
   const handleDelete = async (vacationId) => {
     setDeleting(true);
     try {
@@ -361,7 +386,7 @@ export default function Vacations() {
       await loadVacations();
       setDeletingId(null);
     } catch (err) {
-      console.error('Fehler beim Loeschen:', err);
+      console.error('Fehler beim Löschen:', err);
     }
     setDeleting(false);
   };
@@ -435,7 +460,7 @@ export default function Vacations() {
             <h2 style={styles.emptyTitle}>Noch keine Urlaube</h2>
             <p style={styles.emptyText}>
               Erstelle deinen ersten Urlaub, um Ausgaben zu tracken und den
-              Ueberblick zu behalten.
+              Überblick zu behalten.
             </p>
             <motion.button
               style={styles.btnPrimary}
@@ -521,7 +546,7 @@ export default function Vacations() {
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
                               >
-                                Ausgewaehlt
+                                Ausgewählt
                               </motion.span>
                             )}
                           </>
@@ -547,7 +572,7 @@ export default function Vacations() {
                             whileHover={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => setDeletingId(vac.id)}
-                            title="Loeschen"
+                            title="Löschen"
                           >
                             <Trash2 size={15} />
                           </motion.button>
@@ -567,7 +592,7 @@ export default function Vacations() {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <p style={styles.confirmText}>
-                            Urlaub "{vac.name}" wirklich loeschen?
+                            Urlaub "{vac.name}" wirklich löschen?
                           </p>
                           <div style={styles.confirmActions}>
                             <motion.button
@@ -589,7 +614,7 @@ export default function Vacations() {
                               onClick={() => handleDelete(vac.id)}
                               disabled={deleting}
                             >
-                              {deleting ? 'Wird geloescht...' : 'Loeschen'}
+                              {deleting ? 'Wird gelöscht...' : 'Löschen'}
                             </motion.button>
                           </div>
                         </motion.div>
@@ -672,6 +697,8 @@ export default function Vacations() {
                   onClick={() => {
                     setShowCreateModal(false);
                     setNewName('');
+                    setJoinCode('');
+                    setJoinError('');
                   }}
                   disabled={creating}
                 >
@@ -688,6 +715,49 @@ export default function Vacations() {
                   disabled={!newName.trim() || creating}
                 >
                   {creating ? 'Wird erstellt...' : 'Erstellen'}
+                </motion.button>
+              </div>
+
+              {/* Divider */}
+              <div style={{
+                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                margin: '1.5rem 0',
+              }} />
+
+              {/* Join with code */}
+              <h2 style={styles.modalTitle}>Mit Code beitreten</h2>
+              <input
+                style={styles.input}
+                placeholder="Einladungscode eingeben"
+                value={joinCode}
+                onChange={(e) => { setJoinCode(e.target.value); setJoinError(''); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleJoin();
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                }}
+              />
+              {joinError && (
+                <p style={{ color: '#ef4444', fontSize: '0.85rem', margin: '0.5rem 0 0' }}>
+                  {joinError}
+                </p>
+              )}
+              <div style={{ ...styles.modalActions, marginTop: '0.75rem' }}>
+                <motion.button
+                  style={{
+                    ...styles.btnPrimary,
+                    opacity: !joinCode.trim() || joining ? 0.5 : 1,
+                  }}
+                  whileHover={{ scale: joinCode.trim() && !joining ? 1.03 : 1 }}
+                  whileTap={{ scale: joinCode.trim() && !joining ? 0.97 : 1 }}
+                  onClick={handleJoin}
+                  disabled={!joinCode.trim() || joining}
+                >
+                  {joining ? 'Wird beigetreten...' : 'Beitreten'}
                 </motion.button>
               </div>
             </motion.div>

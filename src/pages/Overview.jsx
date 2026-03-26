@@ -31,7 +31,9 @@ export default function Overview() {
   const charts = currentVacation?.charts || [];
 
   const convertAmount = (amount, fromRate, toCurrency) => {
-    const baseAmount = parseFloat(amount) / (parseFloat(fromRate) || 1);
+    const amt = parseFloat(amount) || 0;
+    const rate = parseFloat(fromRate) || 1;
+    const baseAmount = amt / rate;
     const targetRate = rates[toCurrency] || 1;
     return baseAmount * targetRate;
   };
@@ -61,27 +63,33 @@ export default function Overview() {
     const cur = kpi.currency || displayCurrency;
     const exps = getExpensesByCategories(kpi.categories, kpi.mergedCategories);
 
+    let result;
     switch (kpi.type) {
       case 'total': {
-        return exps.reduce((sum, e) => sum + convertAmount(e.amount, e.exchangeRate, cur), 0);
+        result = exps.reduce((sum, e) => sum + convertAmount(e.amount, e.exchangeRate, cur), 0);
+        break;
       }
       case 'category_total': {
-        return exps.reduce((sum, e) => sum + convertAmount(e.amount, e.exchangeRate, cur), 0);
+        result = exps.reduce((sum, e) => sum + convertAmount(e.amount, e.exchangeRate, cur), 0);
+        break;
       }
       case 'daily_avg': {
         const total = exps.reduce((sum, e) => sum + convertAmount(e.amount, e.exchangeRate, cur), 0);
         const days = new Set(exps.map(e => e.date).filter(Boolean));
-        return days.size > 0 ? total / days.size : 0;
+        result = days.size > 0 ? total / days.size : 0;
+        break;
       }
       case 'category_daily_avg': {
         const total = exps.reduce((sum, e) => sum + convertAmount(e.amount, e.exchangeRate, cur), 0);
         const days = new Set(exps.map(e => e.date).filter(Boolean));
-        return days.size > 0 ? total / days.size : 0;
+        result = days.size > 0 ? total / days.size : 0;
+        break;
       }
       case 'count': return exps.length;
       case 'category_count': return exps.length;
       default: return 0;
     }
+    return isNaN(result) ? 0 : result;
   };
 
   const getChartData = (chart) => {
@@ -94,7 +102,10 @@ export default function Overview() {
     });
 
     const labels = Object.keys(grouped);
-    const values = Object.values(grouped).map(v => Math.round(v * 100) / 100);
+    const values = Object.values(grouped).map(v => {
+      const rounded = Math.round(v * 100) / 100;
+      return isNaN(rounded) ? 0 : rounded;
+    });
     const sym = currencySymbols[cur] || cur;
 
     return {
@@ -333,7 +344,7 @@ export default function Overview() {
   };
 
   return (
-    <div style={s.page}>
+    <div id="export-content" style={s.page}>
       {/* KPIs Section */}
       <div style={s.section}>
         <div style={s.sectionHeader}>

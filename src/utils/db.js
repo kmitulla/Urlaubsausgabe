@@ -54,10 +54,12 @@ export async function loginUser(username, password) {
 // ============ VACATIONS ============
 
 export async function getVacations(userId) {
-  const snap = await getDocs(
-    query(collection(db, 'vacations'), where('userId', '==', userId))
-  );
-  const vacs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap1 = await getDocs(query(collection(db, 'vacations'), where('userId', '==', userId)));
+  const snap2 = await getDocs(query(collection(db, 'vacations'), where('members', 'array-contains', userId)));
+  const map = new Map();
+  snap1.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+  snap2.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+  const vacs = Array.from(map.values());
   vacs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   return vacs;
 }
@@ -66,6 +68,8 @@ export async function createVacation(userId, name) {
   const ref = await addDoc(collection(db, 'vacations'), {
     userId,
     name,
+    inviteCode: generateInviteCode(),
+    members: [userId],
     createdAt: serverTimestamp(),
     settings: {
       currency: 'EUR',
@@ -147,6 +151,26 @@ export async function importCategories(fromVacationId, toVacationId) {
   if (!fromVac || !toVac) return;
   const merged = [...new Set([...(toVac.categories || []), ...(fromVac.categories || [])])];
   await updateVacation(toVacationId, { categories: merged });
+}
+
+// ============ INVITE CODES ============
+
+export function generateInviteCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+export async function joinVacation(code, userId) {
+  const snap = await getDocs(query(collection(db, 'vacations'), where('inviteCode', '==', code.toUpperCase())));
+  if (snap.empty) return { success: false, error: 'Kein Urlaub mit diesem Code gefunden' };
+  const vacDoc = snap.docs[0];
+  const vac = { id: vacDoc.id, ...vacDoc.data() };
+  const members = vac.members || [vac.userId];
+  if (members.includes(userId)) return { success: false, error: 'Du bist bereits in diesem Urlaub' };
+  await updateDoc(doc(db, 'vacations', vac.id), { members: [...members, userId] });
+  return { success: true, vacation: vac };
 }
 
 // ============ SHARED VACATION CALCULATIONS ============
