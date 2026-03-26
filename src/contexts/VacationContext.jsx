@@ -14,21 +14,28 @@ export function VacationProvider({ children }) {
   const loadVacations = useCallback(async () => {
     if (!currentUser) return;
     setLoading(true);
-    const vacs = await getVacations(currentUser.id);
-    setVacations(vacs);
+    try {
+      const vacs = await getVacations(currentUser.id);
+      setVacations(vacs);
 
-    const storedId = localStorage.getItem('currentVacation');
-    if (storedId) {
-      const vac = vacs.find(v => v.id === storedId);
-      if (vac) {
-        setCurrentVacation(vac);
-        const exps = await getExpenses(vac.id);
-        setExpenses(exps);
+      const storedId = localStorage.getItem('currentVacation');
+      if (storedId) {
+        const vac = vacs.find(v => v.id === storedId);
+        if (vac) {
+          setCurrentVacation(vac);
+          try {
+            const exps = await getExpenses(vac.id);
+            setExpenses(exps);
+          } catch { setExpenses([]); }
+        } else if (vacs.length > 0) {
+          await selectVacation(vacs[0].id);
+        }
       } else if (vacs.length > 0) {
-        selectVacation(vacs[0].id);
+        await selectVacation(vacs[0].id);
       }
-    } else if (vacs.length > 0) {
-      await selectVacation(vacs[0].id);
+    } catch (err) {
+      console.error('Error loading vacations:', err);
+      setVacations([]);
     }
     setLoading(false);
   }, [currentUser]);

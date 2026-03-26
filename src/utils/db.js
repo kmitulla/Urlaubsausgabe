@@ -1,7 +1,7 @@
 import { db } from '../firebase';
 import {
   collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, addDoc, writeBatch, serverTimestamp
+  query, where, addDoc, writeBatch, serverTimestamp
 } from 'firebase/firestore';
 
 // ============ USERS ============
@@ -55,9 +55,11 @@ export async function loginUser(username, password) {
 
 export async function getVacations(userId) {
   const snap = await getDocs(
-    query(collection(db, 'vacations'), where('userId', '==', userId), orderBy('createdAt', 'desc'))
+    query(collection(db, 'vacations'), where('userId', '==', userId))
   );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const vacs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  vacs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  return vacs;
 }
 
 export async function createVacation(userId, name) {
@@ -113,9 +115,11 @@ export async function getVacation(vacationId) {
 
 export async function getExpenses(vacationId) {
   const snap = await getDocs(
-    query(collection(db, 'expenses'), where('vacationId', '==', vacationId), orderBy('createdAt', 'desc'))
+    query(collection(db, 'expenses'), where('vacationId', '==', vacationId))
   );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const exps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  exps.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  return exps;
 }
 
 export async function createExpense(vacationId, data) {
